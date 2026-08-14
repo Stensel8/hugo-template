@@ -9,6 +9,7 @@ Found a bug, have an improvement in mind, or want to extend the template? Issues
 This project uses [Conventional Commits](https://www.conventionalcommits.org/).
 
 **Format:**
+
 ```
 <type>: <short description>
 ```
@@ -25,6 +26,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/).
 | `refactor` | Restructure without changing behavior (e.g. rename files, move sections) |
 
 **Examples:**
+
 ```
 feat: add dark mode toggle component
 fix: correct baseURL placeholder in hugo.toml
@@ -34,6 +36,7 @@ style: fix trailing whitespace in baseof.html
 ```
 
 **Rules:**
+
 - Use lowercase for the type and description
 - Keep the subject line under 72 characters
 - No period at the end

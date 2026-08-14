@@ -30,6 +30,65 @@ cd hugo-template/src
 hugo server
 ```
 
+Install Hugo **extended**, in the version the CI uses (see
+[`.github/actions/setup-hugo/action.yml`](.github/actions/setup-hugo/action.yml)).
+
+## Starting a new site from this template
+
+Everything below already works on a fresh copy; the deploy is the only part
+that needs anything from you.
+
+1. Set the repository secrets for Bunny. Until `BUNNY_STORAGE_ZONE` exists the
+   deploy workflow stops with a notice instead of failing, so a new site stays
+   green while you get round to it.
+
+   | Secret | What it is |
+   | --- | --- |
+   | `BUNNY_STORAGE_ZONE` | storage zone name |
+   | `BUNNY_ACCESS_KEY` | storage zone password |
+   | `BUNNY_STORAGE_ENDPOINT` | e.g. `https://storage.bunnycdn.com` |
+   | `BUNNY_API_KEY` | account API key, only for purging |
+   | `BUNNY_PULL_ZONE_ID` | pull zone to purge, only for purging |
+
+2. Change `baseURL` and `title` in `src/hugo.toml`, and trim `disableKinds` to
+   whatever the site actually needs. It ships with almost everything off.
+
+3. Delete `preview-light.avif`, `preview-dark.avif` and this section.
+
+## CI/CD
+
+Four workflows. Every action is pinned to a commit SHA, and every tool that gets
+downloaded is pinned to a version and a checksum.
+
+| Workflow | What it does |
+| --- | --- |
+| `quality.yml` | Hugo build with `--panicOnWarning`, HTMLHint, offline link check, markdownlint, actionlint |
+| `security.yml` | Semgrep, zizmor on the workflows themselves, OpenSSF Scorecard |
+| `config-validation.yml` | Validates `renovate.json` and `dependabot.yml` — the configs nothing else exercises |
+| `deploy-bunny.yml` | Builds and syncs to Bunny Storage, then purges the pull zone |
+
+### Dependency updates
+
+There is no `package.json`. Renovate keeps GitHub Actions current on its own,
+and picks up tool versions from the `# renovate:` comment above each one.
+
+Renovate cannot compute a checksum, so a version bump would otherwise land with
+the previous release's hash still in place and fail the build.
+`update-checksums.yml` recalculates them on Renovate's own pull requests and
+commits the result back. It verifies each download against the checksum the
+project publishes before writing anything, so a hash only lands here if
+upstream vouches for it too.
+
+That flow depends on `gitIgnoredAuthors` in `renovate.json`. Without it Renovate
+treats the bot's commit as the branch having been modified by someone else and
+stops maintaining the pull request.
+
+To bump a tool by hand:
+
+```bash
+.github/scripts/update-tool-checksums.sh
+```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

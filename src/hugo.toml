@@ -1,6 +1,10 @@
 baseURL = "https://example.com/"
 title   = "My Site"
 
+# Hugo otherwise injects a tab-indented <meta name="generator"> into <head>,
+# which trips the HTML linter and tells every visitor the exact Hugo version.
+disableHugoGeneratorInject = true
+
 # Only home for now, remove what you want.
 disableKinds = [
     "taxonomy",

@@ -6,25 +6,42 @@
   "timezone": "Europe/Amsterdam",
   "forkProcessing": "enabled",
   "pinDigests": true,
-  "assigneesFromCodeOwners": true,
-  "reviewersFromCodeOwners": true,
-  "enabledManagers": [
-    "github-actions"
+  "assignees": [
+    "Stensel8"
+  ],
+  "reviewers": [
+    "Stensel8"
+  ],
+  "semanticCommits": "enabled",
+  "gitIgnoredAuthors": [
+    "github-actions[bot]@users.noreply.github.com",
+    "41898282+github-actions[bot]@users.noreply.github.com"
   ],
   "labels": [
     "dependencies"
   ],
-  "packageRules": [
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 5,
+  "minimumReleaseAge": "7 days",
+  "enabledManagers": [
+    "github-actions",
+    "custom.regex"
+  ],
+  "customManagers": [
     {
-      "matchManagers": [
-        "dockerfile",
-        "docker-compose"
+      "customType": "regex",
+      "description": "Tool versions pinned in workflows and composite actions, annotated with a `# renovate:` comment on the line above",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.*\\.ya?ml$/",
+        "/^\\.github/actions/.*/action\\.ya?ml$/"
       ],
-      "groupName": "Docker images",
-      "addLabels": [
-        "docker"
-      ]
-    },
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)(?: extractVersion=(?<extractVersion>\\S+))?\\s+[A-Za-z_]+: \"(?<currentValue>[^\"]+)\""
+      ],
+      "extractVersionTemplate": "^v?(?<version>.*)$"
+    }
+  ],
+  "packageRules": [
     {
       "matchManagers": [
         "github-actions"
@@ -32,10 +49,20 @@
       "groupName": "GitHub Actions",
       "addLabels": [
         "github-actions"
-      ]
+      ],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Hugo, actionlint, HTMLHint and lychee. Not automerged: some are pinned alongside a checksum, and update-checksums.yml has to push the recalculated hash onto the branch first.",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "groupName": "Build tooling versions",
+      "addLabels": [
+        "build-tooling"
+      ],
+      "automerge": false
     }
-  ],
-  "automerge": true,
-  "automergeType": "pr",
-  "semanticCommits": "enabled"
+  ]
 }
