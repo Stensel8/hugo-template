@@ -1,0 +1,105 @@
+# Copyright (C) 2026 Sten Tijhuis
+# SPDX-License-Identifier: MIT
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Weekly scan to catch new vulnerabilities in existing code
+  schedule:
+    - cron: '0 5 * * 1'
+
+permissions: {}
+
+jobs:
+
+  # Semgrep: SAST scanner for XSS and other vulnerabilities in the templates
+  # and the little JavaScript the site ships
+  semgrep:
+    name: Semgrep SAST scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: semgrep/semgrep@sha256:bdf7013b2c3634a487671158da77c554f531742326b543a9464d2adf6c433ac8
+    # Skip Renovate PRs: no token available in that context
+    if: github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Exclusions live in .semgrepignore
+      - name: Run Semgrep scan
+        run: semgrep scan --config auto --error src/layouts/ src/assets/
+
+  # zizmor: detects security issues in GitHub Actions workflows
+  # e.g. injection risks via expressions, overly broad permissions, unsafe triggers
+  workflow-security:
+    name: Workflow security (zizmor)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # pipx, not pip: the runner's system Python is externally managed
+      # (PEP 668), so a plain pip install aborts.
+      - name: Install zizmor
+        env:
+          # renovate: datasource=pypi depName=zizmor
+          ZIZMOR_VERSION: "1.29.0"
+        run: pipx install "zizmor==${ZIZMOR_VERSION}"
+
+      - name: Run zizmor
+        run: zizmor --format sarif . > zizmor.sarif || true
+
+      # Results appear in the Security tab of the repository
+      # continue-on-error: upload fails for private repos without GitHub Advanced Security
+      - name: Upload results to GitHub Security
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+        continue-on-error: true
+        with:
+          sarif_file: zizmor.sarif
+          category: zizmor
+
+  # OpenSSF Scorecard: evaluates the security hygiene of the repository
+  # Checks: branch protection, pinned dependencies, code review requirements
+  scorecard:
+    name: OpenSSF Scorecard
+    runs-on: ubuntu-latest
+    # Scorecard only works on pushes to main, not on PRs from forks
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard analysis
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        continue-on-error: true
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_results: false
+
+      # continue-on-error: upload fails for private repos without GitHub Advanced Security
+      - name: Upload results to GitHub Security
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+        continue-on-error: true
+        with:
+          sarif_file: scorecard.sarif
+          category: scorecard

@@ -1,0 +1,19 @@
+default: true
+
+# ── Disabled: not applicable to this repo ──────────────────────────────────
+
+# Line length — content is prose-wrapped by hand, not to a column limit
+MD013: false
+
+# First line must be a top-level heading — content files start with front matter
+MD041: false
+
+# Bare URLs — used in code blocks and command examples in the README
+MD034: false
+
+# Code block language — the README's blocks are all shell, tagging is optional
+MD040: false
+
+# Table column style (pipe spacing/alignment) — overly pedantic, tables render
+# correctly regardless of exact pipe spacing
+MD060: false

@@ -1,0 +1,111 @@
+# Copyright (C) 2026 Sten Tijhuis
+# SPDX-License-Identifier: MIT
+name: Deploy to Bunny.net
+
+# Wired up but dormant. A site started from this template has no Bunny secrets
+# yet, and a deploy workflow that goes red on every push until someone gets
+# round to configuring it teaches people to ignore red. So the job checks for
+# its secrets first and stops with a notice when they are missing.
+#
+# To switch it on, set these repository secrets:
+#
+#   BUNNY_STORAGE_ZONE      storage zone name
+#   BUNNY_ACCESS_KEY        storage zone password
+#   BUNNY_STORAGE_ENDPOINT  e.g. https://storage.bunnycdn.com
+#   BUNNY_API_KEY           account API key, for purging the cache
+#   BUNNY_PULL_ZONE_ID      id of the pull zone to purge
+#
+# The last two are only needed for the purge step; leave them out and the
+# deploy still runs, it just does not purge.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - '.github/workflows/deploy-bunny.yml'
+      - '.github/actions/setup-hugo/**'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+# No token needed; jobs that do opt in explicitly.
+permissions: {}
+
+jobs:
+  deploy:
+    name: Build and deploy to Bunny Storage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check whether this site has been hooked up yet
+        id: configured
+        # The secrets context cannot be read from a step-level `if`, so the
+        # answers are turned into step outputs here and used as conditions
+        # further down.
+        env:
+          STORAGE_ZONE: ${{ secrets.BUNNY_STORAGE_ZONE }}
+          PULL_ZONE_ID: ${{ secrets.BUNNY_PULL_ZONE_ID }}
+        run: |
+          if [ -z "${STORAGE_ZONE}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Bunny secrets configured, so there is nothing to deploy to. See the comment at the top of this workflow for the list."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ -n "${PULL_ZONE_ID}" ]; then
+            echo "purge=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "purge=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out source code
+        if: steps.configured.outputs.ready == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Hugo
+        if: steps.configured.outputs.ready == 'true'
+        uses: ./.github/actions/setup-hugo
+
+      - name: Build site
+        if: steps.configured.outputs.ready == 'true'
+        working-directory: src
+        env:
+          TZ: Europe/Amsterdam
+        run: hugo --minify --gc
+
+      - name: Sync to Bunny Storage (S3)
+        if: steps.configured.outputs.ready == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BUNNY_STORAGE_ZONE }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BUNNY_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: de
+          STORAGE_ZONE: ${{ secrets.BUNNY_STORAGE_ZONE }}
+          STORAGE_ENDPOINT: ${{ secrets.BUNNY_STORAGE_ENDPOINT }}
+        run: |
+          aws s3 sync src/public/ "s3://${STORAGE_ZONE}/" \
+            --endpoint-url "${STORAGE_ENDPOINT}" \
+            --delete \
+            --no-progress
+
+      - name: Wait for storage replication
+        if: steps.configured.outputs.ready == 'true'
+        run: sleep 15
+
+      - name: Purge Bunny Pull Zone cache
+        if: steps.configured.outputs.ready == 'true' && steps.configured.outputs.purge == 'true'
+        env:
+          PULL_ZONE_ID: ${{ secrets.BUNNY_PULL_ZONE_ID }}
+          API_KEY: ${{ secrets.BUNNY_API_KEY }}
+        run: |
+          curl -sS --fail-with-body -X POST \
+            "https://api.bunny.net/pullzone/${PULL_ZONE_ID}/purgeCache" \
+            -H "AccessKey: ${API_KEY}" \
+            -H "Content-Type: application/json"

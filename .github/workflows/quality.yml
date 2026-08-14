@@ -1,0 +1,179 @@
+# Copyright (C) 2026 Sten Tijhuis
+# SPDX-License-Identifier: MIT
+name: Code quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# No token needed; jobs that do opt in explicitly.
+permissions: {}
+
+jobs:
+  # A build that fails here is a broken deploy caught early. --panicOnWarning
+  # is stricter than the deploy build on purpose: a fresh Hugo deprecation
+  # should block a merge, not a release that is already on its way out.
+  build:
+    name: Hugo build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Hugo
+        uses: ./.github/actions/setup-hugo
+
+      - name: Build site
+        working-directory: src
+        env:
+          TZ: Europe/Amsterdam
+        run: hugo --minify --gc --printPathWarnings --panicOnWarning
+
+      # include-hidden-files: .well-known is a dot-directory and would be
+      # silently dropped, which makes link-check report perfectly good links as
+      # dead. Most sites grow a security.txt sooner or later.
+      - name: Upload built site
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public
+          path: src/public/
+          include-hidden-files: true
+          retention-days: 1
+
+  # HTMLHint: structural errors, missing attributes, accessibility. Runs on the
+  # built output, not on the templates: a Hugo layout is not a standalone HTML
+  # document, so linting one only produces noise.
+  html-lint:
+    name: HTML linting
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Hugo
+        uses: ./.github/actions/setup-hugo
+
+      # No --minify here: minifying drops the quotes around attribute values
+      # wherever it can, which is exactly what attr-value-double-quotes flags.
+      - name: Build site unminified
+        working-directory: src
+        run: hugo --gc
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 'lts/*'
+
+      - name: Install HTMLHint
+        env:
+          # renovate: datasource=npm depName=htmlhint
+          HTMLHINT_VERSION: "1.9.2"
+        run: npm install -g "htmlhint@${HTMLHINT_VERSION}"
+
+      - name: Check HTML
+        run: htmlhint "src/public/**/*.html"
+
+  # lychee in offline mode: every internal href and src must resolve to a file
+  # the build actually produced.
+  link-check:
+    name: Broken link check
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+    steps:
+      - name: Download built site
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: public
+          path: public/
+
+      # Installed by hand rather than through lycheeverse/lychee-action, which
+      # fetches its binary with a bare `curl -sfLO`: no retry, and no check on
+      # what comes back.
+      - name: Install lychee
+        env:
+          # extractVersion: lychee tags its releases "lychee-v0.24.2", not
+          # "v0.24.2", so the default pattern cannot read the version out.
+          # renovate: datasource=github-releases depName=lycheeverse/lychee extractVersion=^lychee-v(?<version>.+)$
+          LYCHEE_VERSION: "0.24.2"
+          # From the release's own lychee-x86_64-unknown-linux-gnu.tar.gz.sha256
+          LYCHEE_SHA256: "1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a"
+        run: |
+          curl -sSL --fail-with-body -o lychee.tar.gz \
+            --retry 5 --retry-delay 3 --retry-all-errors \
+            "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-gnu.tar.gz"
+          echo "${LYCHEE_SHA256}  lychee.tar.gz" | sha256sum -c -
+          tar -xzf lychee.tar.gz lychee-x86_64-unknown-linux-gnu/lychee
+          sudo install -m 0755 lychee-x86_64-unknown-linux-gnu/lychee /usr/local/bin/lychee
+
+      # --index-files: Hugo serves every page as <page>/index.html, and without
+      # this lychee stops at the directory. That makes a link to /about/ pass as
+      # long as the directory exists, even if it is empty, and makes #fragments
+      # into another page impossible to resolve.
+      #
+      # The glob is quoted deliberately: unquoted, bash expands it first, and
+      # without globstar ** collapses to a single directory level.
+      - name: Check internal links
+        run: |
+          lychee --offline --include-fragments --index-files index.html \
+            --root-dir "${GITHUB_WORKSPACE}/public" "public/**/*.html"
+
+  # markdownlint: keeps content/ and the repo's own Markdown consistent.
+  markdown-lint:
+    name: Markdown linting
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24.2.0
+        with:
+          globs: |
+            src/content/**/*.md
+            *.md
+
+  # actionlint: checks workflow files for syntax errors and incorrect expressions
+  workflow-lint:
+    name: Check workflow files
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Pinned release plus checksum, rather than piping a script from a branch
+      # straight into bash.
+      - name: Install actionlint
+        env:
+          # renovate: datasource=github-releases depName=rhysd/actionlint
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        run: |
+          curl -sSL --fail-with-body -o actionlint.tar.gz \
+            --retry 5 --retry-delay 3 --retry-all-errors \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum -c -
+          tar -xzf actionlint.tar.gz actionlint
+          sudo install -m 0755 actionlint /usr/local/bin/actionlint
+
+      - name: Run actionlint
+        run: actionlint -color
