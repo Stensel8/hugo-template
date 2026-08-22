@@ -65,17 +65,21 @@ jobs:
         with:
           node-version: 'lts/*'
 
+      # `npm ci` against a checked-in package-lock.json (.github/htmlhint/),
+      # rather than `npm install -g htmlhint@version`: the latter resolves
+      # through the registry at run time with nothing to verify what comes
+      # back against, which is what Scorecard's Pinned-Dependencies check and
+      # zizmor's adhoc-packages audit both flag it for. `npm ci` installs
+      # exactly what the lockfile's integrity hashes say, and bumping the
+      # version is a normal Renovate PR against that lockfile.
       - name: Install HTMLHint
-        env:
-          # renovate: datasource=npm depName=htmlhint
-          HTMLHINT_VERSION: "1.9.2"
-        run: npm install -g "htmlhint@${HTMLHINT_VERSION}"
+        run: npm ci --prefix .github/htmlhint
 
       # HTMLHint: structural errors, missing attributes, accessibility. Runs on
       # the built output, not on the templates: a Hugo layout is not a
       # standalone HTML document, so linting one only produces noise.
       - name: Check HTML
-        run: htmlhint "src/public-lint/**/*.html"
+        run: .github/htmlhint/node_modules/.bin/htmlhint "src/public-lint/**/*.html"
 
       # Installed by hand rather than through lycheeverse/lychee-action, which
       # fetches its binary with a bare `curl -sfLO`: no retry, and no check on

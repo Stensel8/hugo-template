@@ -25,6 +25,7 @@
   "minimumReleaseAge": "7 days",
   "enabledManagers": [
     "github-actions",
+    "npm",
     "custom.regex"
   ],
   "customManagers": [
@@ -56,7 +57,8 @@
     {
       "description": "Hugo, actionlint, HTMLHint and lychee. Not automerged: some are pinned alongside a checksum, and update-checksums.yml has to push the recalculated hash onto the branch first.",
       "matchManagers": [
-        "custom.regex"
+        "custom.regex",
+        "npm"
       ],
       "groupName": "Build tooling versions",
       "addLabels": [
