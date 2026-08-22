@@ -1,12 +1,32 @@
+# EditorConfig keeps formatting consistent across editors and IDEs.
+# VS Code, JetBrains and others read this file automatically.
+# More info: https://editorconfig.org
+#
+# The other config files in this repo that cannot carry comments themselves,
+# because they are JSON:
+#
+#   .htmlhintrc    - HTML linting (HTMLHint). Structure and accessibility rules.
+#   renovate.json  - Renovate bot. Automatic dependency updates via pull requests.
+
 root = true
 
 [*]
 charset = utf-8
 end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
-trim_trailing_whitespace = true
-insert_final_newline = true
 
 [*.md]
+# Trailing whitespace is meaningful in Markdown (line break)
 trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[*.sh]
+indent_size = 4
