@@ -65,11 +65,22 @@ jobs:
         with:
           node-version: 'lts/*'
 
+      # Fetched as a tarball and checksummed, rather than `npm install -g
+      # htmlhint@version`: that resolves through the registry at run time with
+      # no verification against what actually comes back, which is what
+      # Scorecard's Pinned-Dependencies check and zizmor's adhoc-packages audit
+      # both flag it for.
       - name: Install HTMLHint
         env:
           # renovate: datasource=npm depName=htmlhint
           HTMLHINT_VERSION: "1.9.2"
-        run: npm install -g "htmlhint@${HTMLHINT_VERSION}"
+          HTMLHINT_SHA256: "c32775c6abf4ed12bbb87c7310ff76802270989f4880a25196d196b7c7fe7c17"
+        run: |
+          curl -sSL --fail-with-body -o htmlhint.tgz \
+            --retry 5 --retry-delay 3 --retry-all-errors \
+            "https://registry.npmjs.org/htmlhint/-/htmlhint-${HTMLHINT_VERSION}.tgz"
+          echo "${HTMLHINT_SHA256}  htmlhint.tgz" | sha256sum -c -
+          npm install -g ./htmlhint.tgz
 
       # HTMLHint: structural errors, missing attributes, accessibility. Runs on
       # the built output, not on the templates: a Hugo layout is not a
