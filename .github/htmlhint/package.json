@@ -1,0 +1,8 @@
+{
+  "name": "hugo-template-htmlhint",
+  "private": true,
+  "description": "Pinned HTMLHint install for .github/workflows/quality.yml. Not part of the site.",
+  "dependencies": {
+    "htmlhint": "1.9.2"
+  }
+}
