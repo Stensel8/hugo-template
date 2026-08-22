@@ -62,10 +62,37 @@ downloaded is pinned to a version and a checksum.
 
 | Workflow | What it does |
 | --- | --- |
-| `quality.yml` | Hugo build with `--panicOnWarning`, HTMLHint, offline link check, markdownlint, actionlint |
-| `security.yml` | Semgrep, zizmor on the workflows themselves, OpenSSF Scorecard |
+| `quality.yml` | Two jobs: **site** (Hugo build with `--panicOnWarning`, HTMLHint, offline link check) and **repo** (markdownlint, actionlint, zizmor) |
+| `security.yml` | Semgrep on every push and pull request; OpenSSF Scorecard weekly and on `main` |
 | `config-validation.yml` | Validates `renovate.json` and `dependabot.yml` — the configs nothing else exercises |
 | `deploy-bunny.yml` | Builds and syncs to Bunny Storage, then purges the pull zone |
+
+### Why so few jobs
+
+GitHub bills **per job** and rounds every job up to a whole minute. Eight jobs
+that finish in twenty seconds each cost eight minutes for two minutes of work,
+and on a private repository that comes straight out of the 2,000 free minutes.
+This template used to have eight per push; it has three.
+
+Nothing was dropped. The same linters, the same rules, the same files:
+
+- **The site jobs are merged.** The build, HTMLHint and lychee sat on three
+  runners with three Hugo setups. Now one. The unminified build for HTMLHint
+  goes to `src/public-lint/` so lychee keeps the real output, and it does not
+  reprocess the images: `resources/_gen` is already warm from the first build.
+  The artifact between build and link-check is gone, and with it the upload,
+  the download and the storage.
+- **zizmor moved** from `security.yml` into the repo job. It lints the same
+  files as actionlint, only on security rather than syntax.
+- **Scorecard runs weekly and on `main`**, not on every pull request. It rates
+  branch protection, pinned dependencies and code review, and none of that
+  changes per commit.
+- **`concurrency` with `cancel-in-progress`** on both workflows, except on
+  `main`. Pushing three times to the same PR now leaves one run standing
+  instead of three.
+
+Inside the repo job every step runs on `!cancelled()`, so one red linter does
+not hide the others. The job still fails as soon as anything is wrong.
 
 ### Dependency updates
 

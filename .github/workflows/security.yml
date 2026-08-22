@@ -10,8 +10,17 @@ on:
   # Weekly scan to catch new vulnerabilities in existing code
   schedule:
     - cron: '0 5 * * 1'
+  # So Scorecard can be run on demand; it no longer runs on pull requests
+  workflow_dispatch:
 
 permissions: {}
+
+# Pushing three times in a row to the same PR started three full scans, and the
+# first two are already stale by then. Not on main: there the run is the record
+# that this commit was scanned.
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
 
@@ -36,47 +45,19 @@ jobs:
       - name: Run Semgrep scan
         run: semgrep scan --config auto --error src/layouts/ src/assets/
 
-  # zizmor: detects security issues in GitHub Actions workflows
-  # e.g. injection risks via expressions, overly broad permissions, unsafe triggers
-  workflow-security:
-    name: Workflow security (zizmor)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - name: Check out source code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # pipx, not pip: the runner's system Python is externally managed
-      # (PEP 668), so a plain pip install aborts.
-      - name: Install zizmor
-        env:
-          # renovate: datasource=pypi depName=zizmor
-          ZIZMOR_VERSION: "1.29.0"
-        run: pipx install "zizmor==${ZIZMOR_VERSION}"
-
-      - name: Run zizmor
-        run: zizmor --format sarif . > zizmor.sarif || true
-
-      # Results appear in the Security tab of the repository
-      # continue-on-error: upload fails for private repos without GitHub Advanced Security
-      - name: Upload results to GitHub Security
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
-        continue-on-error: true
-        with:
-          sarif_file: zizmor.sarif
-          category: zizmor
-
   # OpenSSF Scorecard: evaluates the security hygiene of the repository
   # Checks: branch protection, pinned dependencies, code review requirements
   scorecard:
     name: OpenSSF Scorecard
     runs-on: ubuntu-latest
-    # Scorecard only works on pushes to main, not on PRs from forks
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Weekly and on main, not on every pull request. Scorecard rates the
+    # repository's hygiene -- branch protection, pinned dependencies, code
+    # review -- and none of that changes per commit. Running it on every PR
+    # cost a runner for an outcome that was the same anyway.
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     permissions:
       security-events: write
       id-token: write

@@ -1,4 +1,6 @@
 src/public/
+# The unminified build HTMLHint runs on; see .github/workflows/quality.yml
+src/public-lint/
 src/resources/
 src/.hugo_build.lock
 node_modules/
