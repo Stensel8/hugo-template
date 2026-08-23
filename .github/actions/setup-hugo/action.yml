@@ -39,12 +39,12 @@ inputs:
 runs:
   using: composite
   steps:
-    # The release comes off the network, so nothing is executed before the
-    # checksum says it is the archive we pinned.
+    # De release komt van het netwerk, dus er wordt niets uitgevoerd voordat de
+    # checksum zegt dat het het archief is dat we hebben vastgezet.
     #
-    # --retry: the release CDN hands out an occasional 503, and without this a
-    # single one fails the whole build. curl retries 5xx and timeouts on its
-    # own; --retry-all-errors extends that to connection failures.
+    # --retry: de release-CDN geeft af en toe een 503, en zonder dit laat één
+    # zo'n antwoord de hele build falen. curl herhaalt 5xx en timeouts uit
+    # zichzelf; --retry-all-errors trekt dat door naar verbindingsfouten.
     - name: Download and verify Hugo
       shell: bash
       env:
