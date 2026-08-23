@@ -24,6 +24,8 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/).
 | `chore` | Maintenance — dependencies, CI/CD, config |
 | `style` | Formatting, whitespace, typo fixes |
 | `refactor` | Restructure without changing behavior (e.g. rename files, move sections) |
+| `content` | Update or improve existing page content |
+| `revert` | Reverting a previous commit |
 
 **Examples:**
 
