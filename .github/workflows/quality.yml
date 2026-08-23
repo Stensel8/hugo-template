@@ -8,28 +8,28 @@ on:
   pull_request:
     branches: [main]
 
-# No token needed; jobs that do opt in explicitly.
+# Geen token nodig; jobs die dat wel zijn, vragen er expliciet om.
 permissions: {}
 
-# Pushing three times in a row to the same PR started three full runs, and the
-# first two are already stale by then. Not on main: there the run is the record
-# that this commit passed the checks.
+# Drie keer achter elkaar naar dezelfde PR pushen startte drie volledige runs,
+# en de eerste twee zijn op dat moment al achterhaald. Op main niet annuleren:
+# daar is de run de vastlegging dat die commit door de controles kwam.
 concurrency:
   group: quality-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # Everything that needs the built site, in one job.
+  # Alles wat de gebouwde site nodig heeft, in één job.
   #
-  # This used to be three separate jobs: a build, HTMLHint on a second build,
-  # and lychee on an artifact of the first. That cost three runners and three
-  # Hugo setups, and GitHub rounds every job up to a whole minute -- three
-  # minutes billed for work that finishes in one.
+  # Dit waren drie losse jobs: een build, HTMLHint op een tweede build, en
+  # lychee op een artifact van de eerste. Dat kostte drie runners en drie keer
+  # Hugo opzetten, en GitHub rondt elke job naar boven af op een hele minuut --
+  # drie minuten in rekening voor werk dat in één minuut klaar is.
   #
-  # In one job it saves more than those two minutes: the second build does not
-  # have to process the images again, because resources/_gen is already warm
-  # from the first. The artifact between build and link-check disappears with
-  # it, and with that the upload, the download and the storage.
+  # In één job levert het meer op dan die twee minuten: de tweede build hoeft
+  # de afbeeldingen niet opnieuw te verwerken, omdat resources/_gen er al staat
+  # van de eerste. Het artifact tussen build en linkcheck verdwijnt ermee, en
+  # daarmee ook de upload, de download en de opslag.
   site:
     name: Build and check the site
     runs-on: ubuntu-latest
@@ -44,18 +44,19 @@ jobs:
       - name: Set up Hugo
         uses: ./.github/actions/setup-hugo
 
-      # A build that fails here is a broken deploy caught early. --panicOnWarning
-      # is stricter than the deploy build on purpose: a fresh Hugo deprecation
-      # should block a merge, not a release that is already on its way out.
+      # Een build die hier faalt is een kapotte deploy die op tijd gepakt is.
+      # --panicOnWarning is bewust strenger dan de deploy-build: een nieuwe
+      # Hugo-deprecation hoort een merge te blokkeren, niet een release die al
+      # onderweg is.
       - name: Build site
         working-directory: src
         env:
           TZ: Europe/Amsterdam
         run: hugo --minify --gc --printPathWarnings --panicOnWarning
 
-      # No --minify here: minifying drops the quotes around attribute values
-      # wherever it can, which is exactly what attr-value-double-quotes flags.
-      # It goes to its own directory so lychee below keeps the real output.
+      # Hier geen --minify: minifyen haalt de quotes rond attribuutwaarden weg
+      # waar dat kan, en dat is precies waar attr-value-double-quotes op slaat.
+      # Gaat naar een eigen map, zodat lychee hieronder de echte output houdt.
       - name: Build site unminified for HTMLHint
         working-directory: src
         run: hugo --gc --destination public-lint
@@ -65,37 +66,38 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      # `npm ci` against a checked-in package-lock.json (.github/htmlhint/),
-      # rather than `npm install -g htmlhint@version`: the latter resolves
-      # through the registry at run time with nothing to verify what comes
-      # back against, which is what Scorecard's Pinned-Dependencies check and
-      # zizmor's adhoc-packages audit both flag it for. `npm ci` installs
-      # exactly what the lockfile's integrity hashes say, and bumping the
-      # version is a normal Renovate PR against that lockfile.
+      # `npm ci` tegen een ingecheckte package-lock.json (.github/htmlhint/) in
+      # plaats van `npm install -g htmlhint@versie`: die tweede haalt op runtime
+      # iets uit de registry zonder dat er iets is om het resultaat tegen te
+      # verifiëren, en daar slaan zowel Scorecards Pinned-Dependencies als
+      # zizmors adhoc-packages op aan. `npm ci` installeert exact wat de
+      # integrity-hashes in de lockfile zeggen, en een versiebump is gewoon een
+      # Renovate-PR op die lockfile.
       - name: Install HTMLHint
         run: npm ci --prefix .github/htmlhint
 
-      # HTMLHint: structural errors, missing attributes, accessibility. Runs on
-      # the built output, not on the templates: a Hugo layout is not a
-      # standalone HTML document, so linting one only produces noise.
+      # HTMLHint: structuurfouten, ontbrekende attributen, toegankelijkheid.
+      # Draait op de gebouwde output en niet op de templates: een Hugo-layout is
+      # geen zelfstandig HTML-document, dus daarop linten geeft alleen ruis.
       - name: Check HTML
         run: .github/htmlhint/node_modules/.bin/htmlhint "src/public-lint/**/*.html"
 
-      # Installed by hand rather than through lycheeverse/lychee-action, which
-      # fetches its binary with a bare `curl -sfLO`: no retry, and no check on
-      # what comes back.
+      # Met de hand geïnstalleerd in plaats van via lycheeverse/lychee-action,
+      # dat zijn binary met een kale `curl -sfLO` ophaalt: geen retry, en geen
+      # controle op wat er terugkomt.
       #
-      # !cancelled() rather than success(): a broken HTMLHint rule should not
-      # hide the link check. You want both failures in one run, not the second
-      # only after you have fixed the first.
+      # !cancelled() en niet success(): een kapotte HTMLHint-regel hoort de
+      # linkcheck niet te verbergen. Je wilt beide fouten in één run zien, niet
+      # de tweede pas nadat je de eerste hebt opgelost.
       - name: Install lychee
         if: ${{ !cancelled() }}
         env:
-          # extractVersion: lychee tags its releases "lychee-v0.24.2", not
-          # "v0.24.2", so the default pattern cannot read the version out.
+          # extractVersion: lychee tagt zijn releases als "lychee-v0.24.2" en
+          # niet als "v0.24.2", dus het standaardpatroon leest de versie er niet
+          # uit.
           # renovate: datasource=github-releases depName=lycheeverse/lychee extractVersion=^lychee-v(?<version>.+)$
           LYCHEE_VERSION: "0.24.2"
-          # From the release's own lychee-x86_64-unknown-linux-gnu.tar.gz.sha256
+          # Uit de lychee-x86_64-unknown-linux-gnu.tar.gz.sha256 van de release zelf
           LYCHEE_SHA256: "1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a"
         run: |
           curl -sSL --fail-with-body -o lychee.tar.gz \
@@ -105,35 +107,33 @@ jobs:
           tar -xzf lychee.tar.gz lychee-x86_64-unknown-linux-gnu/lychee
           sudo install -m 0755 lychee-x86_64-unknown-linux-gnu/lychee /usr/local/bin/lychee
 
-      # lychee in offline mode: every internal href and src must resolve to a
-      # file the build actually produced.
+      # lychee in offline modus: elke interne href en src moet uitkomen op een
+      # bestand dat de build daadwerkelijk heeft opgeleverd.
       #
-      # --index-files: Hugo serves every page as <page>/index.html, and without
-      # this lychee stops at the directory. That makes a link to /about/ pass as
-      # long as the directory exists, even if it is empty, and makes #fragments
-      # into another page impossible to resolve.
+      # --index-files: Hugo serveert elke pagina als <pagina>/index.html, en
+      # zonder dit stopt lychee bij de map. Daardoor slaagt een link naar
+      # /about/ zolang die map bestaat, ook als hij leeg is, en zijn #fragments
+      # naar een andere pagina niet te controleren.
       #
-      # The glob is quoted deliberately: unquoted, bash expands it first, and
-      # without globstar ** collapses to a single directory level.
+      # De glob staat bewust tussen quotes: zonder quotes vult bash hem eerst
+      # in, en zonder globstar valt ** terug op één mapniveau.
       - name: Check internal links
         if: ${{ !cancelled() }}
         run: |
           lychee --offline --include-fragments --index-files index.html \
             --root-dir "${GITHUB_WORKSPACE}/src/public" "src/public/**/*.html"
 
-  # Everything that has nothing to do with the built site: the Markdown and the
-  # workflow files. None of it needs Hugo.
+  # Alles wat niets met de gebouwde site te maken heeft: de Markdown en de
+  # workflowbestanden. Daar is Hugo nergens voor nodig.
   #
-  # Every step runs on !cancelled(), so one red linter does not hide the others.
-  # The job still fails as soon as anything is wrong.
+  # Elke stap draait op !cancelled(), zodat één rode linter de andere niet
+  # verbergt. De job faalt alsnog zodra er iets fout is.
   repo:
     name: Check the repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # For zizmor's SARIF upload below. That step skips itself while the
-      # repository is private; the permission is here so it starts working by
-      # itself the day that changes.
+      # Voor de SARIF-upload van zizmor hieronder.
       security-events: write
     steps:
       - name: Check out source code
@@ -141,7 +141,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # markdownlint: keeps content/ and the repo's own Markdown consistent.
+      # markdownlint: houdt content/ en de Markdown van de repo zelf consistent.
       - name: Run markdownlint
         if: ${{ !cancelled() }}
         uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24.2.0
@@ -150,8 +150,8 @@ jobs:
             src/content/**/*.md
             *.md
 
-      # Pinned release plus checksum, rather than piping a script from a branch
-      # straight into bash.
+      # Vastgezette release plus checksum, in plaats van een script vanaf een
+      # branch rechtstreeks door bash halen.
       - name: Install actionlint
         if: ${{ !cancelled() }}
         env:
@@ -166,17 +166,17 @@ jobs:
           tar -xzf actionlint.tar.gz actionlint
           sudo install -m 0755 actionlint /usr/local/bin/actionlint
 
-      # actionlint: syntax errors and incorrect expressions in the workflows.
+      # actionlint: syntaxfouten en onjuiste expressies in de workflows.
       - name: Run actionlint
         if: ${{ !cancelled() }}
         run: actionlint -color
 
-      # zizmor used to be its own job in security.yml. It is a linter on the
-      # same files as actionlint, only on security rather than syntax, so it
-      # belongs next to it instead of on a runner of its own.
+      # zizmor stond als eigen job in security.yml. Het is een linter op
+      # dezelfde bestanden als actionlint, alleen op beveiliging in plaats van
+      # syntax, dus hij hoort hiernaast en niet op een eigen runner.
       #
-      # pipx and not pip: the runner's system Python is externally managed
-      # (PEP 668), so a plain pip install aborts.
+      # pipx en niet pip: de systeem-Python van de runner is externally managed
+      # (PEP 668), dus een gewone pip install breekt af.
       - name: Install zizmor
         if: ${{ !cancelled() }}
         env:
@@ -188,8 +188,9 @@ jobs:
         if: ${{ !cancelled() }}
         run: zizmor --format sarif . > zizmor.sarif || true
 
-      # Results show up on the repository's Security tab. Advanced Security is
-      # enabled organisation-wide, so this works on a private repository too.
+      # De resultaten verschijnen op het Security-tabblad van de repository.
+      # Advanced Security staat organisatiebreed aan, dus dit werkt ook op een
+      # privérepository.
       - name: Upload zizmor results to GitHub Security
         uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         if: ${{ !cancelled() }}

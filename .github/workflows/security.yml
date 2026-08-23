@@ -7,25 +7,25 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # Weekly scan to catch new vulnerabilities in existing code
+  # Wekelijkse scan, om nieuwe kwetsbaarheden in bestaande code te vinden
   schedule:
     - cron: '0 5 * * 1'
-  # So Scorecard can be run on demand; it no longer runs on pull requests
+  # Zodat Scorecard op verzoek te draaien is; hij loopt niet meer op PR's
   workflow_dispatch:
 
 permissions: {}
 
-# Pushing three times in a row to the same PR started three full scans, and the
-# first two are already stale by then. Not on main: there the run is the record
-# that this commit was scanned.
+# Drie keer achter elkaar naar dezelfde PR pushen startte drie volledige scans,
+# en de eerste twee zijn op dat moment al achterhaald. Op main niet annuleren:
+# daar is de run de vastlegging dat die commit gescand is.
 concurrency:
   group: security-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
 
-  # Semgrep: SAST scanner for XSS and other vulnerabilities in the templates
-  # and the little JavaScript the site ships
+  # Semgrep: SAST-scanner voor XSS en andere kwetsbaarheden in de templates en
+  # het beetje JavaScript dat de site meelevert
   semgrep:
     name: Semgrep SAST scan
     runs-on: ubuntu-latest
@@ -33,7 +33,7 @@ jobs:
       contents: read
     container:
       image: semgrep/semgrep@sha256:67319956da3dcb58baf5b322899c15458e3963e7018a86aeeb5cd224e69cb77a
-    # Skip Renovate PRs: no token available in that context
+    # Renovate-PR's overslaan: daar is geen token beschikbaar
     if: github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'
     steps:
       - name: Check out source code
@@ -41,19 +41,19 @@ jobs:
         with:
           persist-credentials: false
 
-      # Exclusions live in .semgrepignore
+      # Uitzonderingen staan in .semgrepignore
       - name: Run Semgrep scan
         run: semgrep scan --config auto --error src/layouts/ src/assets/
 
-  # OpenSSF Scorecard: evaluates the security hygiene of the repository
-  # Checks: branch protection, pinned dependencies, code review requirements
+  # OpenSSF Scorecard: beoordeelt de beveiligingshygiëne van de repository.
+  # Kijkt naar branch protection, vastgezette dependencies en code review.
   scorecard:
     name: OpenSSF Scorecard
     runs-on: ubuntu-latest
-    # Weekly and on main, not on every pull request. Scorecard rates the
-    # repository's hygiene -- branch protection, pinned dependencies, code
-    # review -- and none of that changes per commit. Running it on every PR
-    # cost a runner for an outcome that was the same anyway.
+    # Wekelijks en op main, niet op elke pull request. Scorecard beoordeelt de
+    # hygiëne van de repository -- branch protection, vastgezette dependencies,
+    # code review -- en dat verandert niet per commit. Op elke PR draaien kostte
+    # een runner voor een uitkomst die toch hetzelfde was.
     if: >-
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
@@ -77,8 +77,9 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           publish_results: false
 
-      # Results show up on the repository's Security tab. Advanced Security is
-      # enabled organisation-wide, so this works on a private repository too.
+      # De resultaten verschijnen op het Security-tabblad van de repository.
+      # Advanced Security staat organisatiebreed aan, dus dit werkt ook op een
+      # privérepository.
       - name: Upload results to GitHub Security
         uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         continue-on-error: true
