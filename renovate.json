@@ -7,10 +7,12 @@
   "forkProcessing": "enabled",
   "pinDigests": true,
   "assignees": [
-    "Stensel8"
+    "Stensel8",
+    "AdiH1310"
   ],
   "reviewers": [
-    "Stensel8"
+    "Stensel8",
+    "AdiH1310"
   ],
   "semanticCommits": "enabled",
   "gitIgnoredAuthors": [
