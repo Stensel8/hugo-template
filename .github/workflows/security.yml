@@ -13,6 +13,7 @@ on:
   # Zodat Scorecard op verzoek te draaien is; hij loopt niet meer op PR's
   workflow_dispatch:
 
+# Geen token nodig; jobs die dat wel zijn, vragen er expliciet om.
 permissions: {}
 
 # Drie keer achter elkaar naar dezelfde PR pushen startte drie volledige scans,
@@ -25,7 +26,13 @@ concurrency:
 jobs:
 
   # Semgrep: SAST-scanner voor XSS en andere kwetsbaarheden in de templates en
-  # het beetje JavaScript dat de site meelevert
+  # het beetje JavaScript dat de site meelevert.
+  #
+  # De enige job hier die op een pull request draait. Scorecard hieronder niet:
+  # die beoordeelt de repository en niet de commit, dus per PR draaien leverde
+  # een runner op voor een uitkomst die toch hetzelfde was. zizmor is een stap
+  # in de repo-job van quality.yml geworden, om diezelfde reden: die job stond
+  # er al, met dezelfde checkout, dus daar kost hij geen minuut extra.
   semgrep:
     name: Semgrep SAST scan
     runs-on: ubuntu-latest
@@ -50,10 +57,8 @@ jobs:
   scorecard:
     name: OpenSSF Scorecard
     runs-on: ubuntu-latest
-    # Wekelijks en op main, niet op elke pull request. Scorecard beoordeelt de
-    # hygiëne van de repository -- branch protection, vastgezette dependencies,
-    # code review -- en dat verandert niet per commit. Op elke PR draaien kostte
-    # een runner voor een uitkomst die toch hetzelfde was.
+    # Wekelijks en op main, niet op elke pull request. Zie de toelichting bij
+    # semgrep hierboven.
     if: >-
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||

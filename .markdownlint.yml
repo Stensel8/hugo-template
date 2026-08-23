@@ -1,19 +1,27 @@
 default: true
 
-# ── Disabled: not applicable to this repo ──────────────────────────────────
+# ── Uitgezet: niet van toepassing op deze repositories ──────────────────────
 
-# Line length — content is prose-wrapped by hand, not to a column limit
+# Regellengte -- de tekst wordt met de hand afgebroken op de zin, niet op een
+# kolombreedte.
 MD013: false
 
-# First line must be a top-level heading — content files start with front matter
+# Inline HTML -- bewust gebruikt en niet te vervangen door Markdown: <details>
+# en <summary> voor de inklapbare secties in de README, en <address> in de
+# contactgegevens omdat dat het juiste semantische element is.
+MD033: false
+
+# Eerste regel moet een kop op het hoogste niveau zijn -- contentbestanden
+# beginnen met front matter.
 MD041: false
 
-# Bare URLs — used in code blocks and command examples in the README
+# Kale URL's -- gebruikt in codeblokken en commandovoorbeelden in de README.
 MD034: false
 
-# Code block language — the README's blocks are all shell, tagging is optional
+# Taal bij een codeblok -- de blokken in de README zijn allemaal shell, dat
+# labelen voegt niets toe.
 MD040: false
 
-# Table column style (pipe spacing/alignment) — overly pedantic, tables render
-# correctly regardless of exact pipe spacing
+# Kolomstijl in tabellen (spaties rond de pipes) -- overdreven streng, tabellen
+# renderen hoe dan ook goed.
 MD060: false
