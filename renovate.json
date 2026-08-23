@@ -66,5 +66,8 @@
       ],
       "automerge": false
     }
-  ]
+  ],
+  "dependencyDashboard": true,
+  "osvVulnerabilityAlerts": true,
+  "configMigration": true
 }

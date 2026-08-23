@@ -32,7 +32,7 @@ jobs:
     permissions:
       contents: read
     container:
-      image: semgrep/semgrep@sha256:bdf7013b2c3634a487671158da77c554f531742326b543a9464d2adf6c433ac8
+      image: semgrep/semgrep@sha256:67319956da3dcb58baf5b322899c15458e3963e7018a86aeeb5cd224e69cb77a
     # Skip Renovate PRs: no token available in that context
     if: github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'
     steps:
@@ -77,9 +77,10 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           publish_results: false
 
-      # continue-on-error: upload fails for private repos without GitHub Advanced Security
+      # Results show up on the repository's Security tab. Advanced Security is
+      # enabled organisation-wide, so this works on a private repository too.
       - name: Upload results to GitHub Security
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         continue-on-error: true
         with:
           sarif_file: scorecard.sarif
